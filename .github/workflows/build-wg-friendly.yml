@@ -1,10 +1,7 @@
 name: Build wg-friendly APK
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  workflow_dispatch: # Das aktiviert den "Run workflow" Button bei GitHub
 
 jobs:
   build:
