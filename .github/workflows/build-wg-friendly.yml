@@ -13,6 +13,12 @@ jobs:
       - name: Checkout Feed
         uses: actions/checkout@v4
 
+      # Dieser Schritt muss VOR dem SDK kommen, damit der Ordner für chown bereitsteht
+      - name: Create Feed Directory
+        run: |
+          mkdir -p openwrt_feed_collection
+          if [ -d "net" ]; then cp -R net openwrt_feed_collection/; fi
+
       - name: Build with SDK
         uses: openwrt/gh-action-sdk@main
         env:
@@ -20,10 +26,6 @@ jobs:
           FEED_DIR: openwrt_feed_collection
           PACKAGES: wg-friendly
           INDEX: 1
-          # Dieser Befehl wird ausgeführt, BEVOR das SDK zu bauen beginnt:
-          VARS: |
-            mkdir -p package/feeds/myfeed
-            cp -R $GITHUB_WORKSPACE/net package/feeds/myfeed/
 
       - name: Prepare Feed Directory
         run: |
