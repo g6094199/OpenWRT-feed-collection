@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # Wichtig, um in den gh-pages Branch zu schreiben
+  contents: write
 
 jobs:
   build:
@@ -16,26 +16,33 @@ jobs:
       - name: Checkout Feed
         uses: actions/checkout@v4
 
+      # Dieser Schritt behebt den "No such file or directory" Fehler
+      - name: Create Feed Directory
+        run: |
+          mkdir -p openwrt_feed_collection
+          # Kopiere den Inhalt des Repos in den Unterordner für das SDK
+          cp -R net openwrt_feed_collection/ 2>/dev/null || true
+          cp -R utils openwrt_feed_collection/ 2>/dev/null || true
+
       - name: Build with SDK
         uses: openwrt/gh-action-sdk@main
         env:
           ARCH: x86_64-25.12
+          # Hier nutzen wir jetzt den vorbereiteten Ordner
           FEED_DIR: openwrt_feed_collection
           PACKAGES: wg-friendly
 
       - name: Prepare Feed Directory
         run: |
           mkdir -p deploy/all
-          # Kopiere alle APKs und den Index (packages.adb)
+          # Suche nach den gebauten APKs im bin-Ordner des SDK-Workspace
           find bin/packages/ -name "*.apk" -exec cp {} deploy/all/ \;
           find bin/packages/ -name "packages.adb" -exec cp {} deploy/all/ \;
-          # Erstelle eine einfache index.html, damit die Seite nicht leer ist
-          echo "<h1>OpenWrt Feed Collection</h1>" > deploy/index.html
-          echo "<p>Letztes Update: $(date)</p>" >> deploy/index.html
+          echo "<h1>OpenWrt Feed Collection</h1><p>Update: $(date)</p>" > deploy/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./deploy
-          force_orphan: true # Erstellt einen sauberen Branch ohne Git-Historie
+          force_orphan: true
