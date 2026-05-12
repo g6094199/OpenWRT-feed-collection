@@ -1,21 +1,27 @@
 include $(TOPDIR)/rules.mk
 
-# Name und Version
+# Paket-Informationen
 PKG_NAME:=wg-friendly
 PKG_VERSION:=1.0.0
 PKG_RELEASE:=1
-PKG_MAINTAINER:=Dein Name <deine@email.de>
-PKG_LICENSE:=GPL-2.0-or-later
+
+# link to repo
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com
+PKG_SOURCE_VERSION:=main
+PKG_MIRROR_HASH:=skip
+
+PKG_MAINTAINER:=g6094199
+PKG_LICENSE:=GPL-3.0
 
 include $(INCLUDE_DIR)/package.mk
 
-# Definition des Pakets für menuconfig und apk
 define Package/wg-friendly
   SECTION:=net
   CATEGORY:=Network
-  TITLE:=WireGuard Friendly Names (ucode)
-  URL:=https://github.com
+  TITLE:=WireGuard friendly peernames (ucode)
   DEPENDS:=+ucode +ucode-mod-uci +ucode-mod-fs +wireguard-tools
+  URL:=https://github.com/g6094199/OpenWRT-Wireguard-friendly-cli-peernames
 endef
 
 # apk info
@@ -32,7 +38,9 @@ endef
 # where the script will be located
 define Package/wg-friendly/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) ./files/wg-friendly.uc $(1)/usr/bin/wg-friendly
+	# copy wg-friendly to /usr/bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wg-friendly $(1)/usr/bin/wg-friendly
 endef
 
 $(eval $(call BuildPackage,wg-friendly))
+
