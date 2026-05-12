@@ -1,2 +1,6 @@
 # OpenWRT-feed-collection
-OpenWRT collective feeds of this account 
+OpenWRT collective feeds of built packages of this account.
+
+# Installation
+
+
