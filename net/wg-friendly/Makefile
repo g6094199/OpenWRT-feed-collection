@@ -7,7 +7,7 @@ PKG_RELEASE:=1
 
 # link to repo
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://github.com
+PKG_SOURCE_URL:=https://raw.githubusercontent.com/g6094199/OpenWRT-Wireguard-friendly-cli-peernames/refs/heads/main/wg-friendly
 PKG_SOURCE_VERSION:=main
 PKG_MIRROR_HASH:=skip
 
