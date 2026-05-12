@@ -15,9 +15,14 @@ jobs:
 
       - name: Create Feed Directory
         run: |
+          # 1. Erstelle einen temporären Arbeitsordner auf dem GitHub-Server
           mkdir -p openwrt_feed_collection
-          [ -d net ] && cp -R net openwrt_feed_collection/
-          [ -d utils ] && cp -R utils openwrt_feed_collection/
+          
+          # 2. Kopiere deinen 'net'-Ordner (den du im Repo hast) dort hinein
+          if [ -d "net" ]; then cp -R net openwrt_feed_collection/; fi
+          
+          # 3. Kontrolle: Zeige an, ob das Makefile jetzt da ist, wo das SDK es erwartet
+          ls -R openwrt_feed_collection
 
       - name: Build with SDK
         uses: openwrt/gh-action-sdk@main
