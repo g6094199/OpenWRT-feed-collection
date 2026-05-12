@@ -1,10 +1,7 @@
 name: Build and Deploy APK Feed
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  workflow_dispatch: # Nur manueller Start über den Button
 
 permissions:
   contents: write
@@ -18,31 +15,28 @@ jobs:
 
       - name: Create Feed Directory
         run: |
-          # Das SDK erwartet, dass der Feed-Ordner im Workspace existiert
           mkdir -p openwrt_feed_collection
-          # Kopiere deine Ordnerstruktur in das Feed-Verzeichnis
           [ -d net ] && cp -R net openwrt_feed_collection/
           [ -d utils ] && cp -R utils openwrt_feed_collection/
 
       - name: Build with SDK
         uses: openwrt/gh-action-sdk@main
         env:
-          ARCH: x86_64
+          # Festgelegt auf x86_64 stabile Version
+          ARCH: x86_64-23.05
           FEED_DIR: openwrt_feed_collection
-          # WICHTIG: Das Präfix 'package/' weglassen, nur den Paketnamen nutzen
           PACKAGES: wg-friendly
-          # Index sofort mitbauen
           INDEX: 1
 
       - name: Prepare Feed Directory
         run: |
           mkdir -p deploy/all
-          # Suche die gebauten APKs und den Index
+          # Kopiere die gebauten Pakete und den Index für GitHub Pages
           find bin/packages/ -name "wg-friendly*.apk" -exec cp {} deploy/all/ \;
           find bin/packages/ -name "packages.adb" -exec cp {} deploy/all/ \; || \
           find bin/packages/ -name "Packages*" -exec cp {} deploy/all/ \;
           
-          echo "<h1>OpenWrt Feed Collection</h1><p>Update: $(date)</p>" > deploy/index.html
+          echo "<h1>OpenWrt Feed Collection</h1><p>Manueller Build für x86_64 (AllArch Pakete)</p><p>Update: $(date)</p>" > deploy/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
