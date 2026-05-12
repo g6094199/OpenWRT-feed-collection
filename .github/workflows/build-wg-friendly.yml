@@ -27,7 +27,7 @@ jobs:
       - name: Build with SDK (allarch)
         uses: openwrt/gh-action-sdk@main
         env:
-          ARCH: all
+          ARCH: x86-64
           FEED_DIR: openwrt_feed_collection
           PACKAGES: wg-friendly
           INDEX: 1
