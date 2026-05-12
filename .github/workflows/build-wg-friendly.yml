@@ -1,7 +1,7 @@
 name: Build and Deploy APK Feed
 
 on:
-  workflow_dispatch: # Nur manueller Start über den Button
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,39 +13,25 @@ jobs:
       - name: Checkout Feed
         uses: actions/checkout@v4
 
-      - name: Create Feed Directory
-        run: |
-          # 1. Erstelle einen temporären Arbeitsordner auf dem GitHub-Server
-          mkdir -p openwrt_feed_collection
-          
-          # 2. Kopiere deinen 'net'-Ordner (den du im Repo hast) dort hinein
-          if [ -d "net" ]; then cp -R net openwrt_feed_collection/; fi
-          
-          # 3. Kontrolle: Zeige an, ob das Makefile jetzt da ist, wo das SDK es erwartet
-          ls -R openwrt_feed_collection
-
       - name: Build with SDK
         uses: openwrt/gh-action-sdk@main
         env:
-          # Festgelegt auf x86_64 stabile Version
           ARCH: x86_64
-          FEED_DIR: openwrt_feed_collection
+          FEED_DIR: myfeed
           PACKAGES: wg-friendly
           INDEX: 1
           # Dieser Befehl wird ausgeführt, BEVOR das SDK zu bauen beginnt:
           VARS: |
             mkdir -p package/feeds/myfeed
             cp -R $GITHUB_WORKSPACE/net package/feeds/myfeed/
-            
+
       - name: Prepare Feed Directory
         run: |
           mkdir -p deploy/all
-          # Kopiere die gebauten Pakete und den Index für GitHub Pages
           find bin/packages/ -name "wg-friendly*.apk" -exec cp {} deploy/all/ \;
           find bin/packages/ -name "packages.adb" -exec cp {} deploy/all/ \; || \
           find bin/packages/ -name "Packages*" -exec cp {} deploy/all/ \;
-          
-          echo "<h1>OpenWrt Feed Collection</h1><p>Manueller Build für x86_64 (AllArch Pakete)</p><p>Update: $(date)</p>" > deploy/index.html
+          echo "<h1>OpenWrt Feed Collection</h1><p>Update: $(date)</p>" > deploy/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
