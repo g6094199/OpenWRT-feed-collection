@@ -1,0 +1,22 @@
+name: Build wg-friendly APK
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build with SDK
+        uses: openwrt/gh-action-sdk@main
+        env:
+          ARCH: x86_64-25.12  # Hier Architektur und Version anpassen
+          FEED_DIR: mycustom
+          PACKAGES: wg-friendly
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wg-friendly-apk
+          path: bin/packages/*/mycustom/*.apk
