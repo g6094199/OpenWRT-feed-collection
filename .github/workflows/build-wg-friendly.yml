@@ -1,63 +1,80 @@
-# package/wg-friendly/Makefile
-include $(TOPDIR)/rules.mk
+name: Build wg-friendly for 25.12
 
-PKG_NAME:=wg-friendly
-PKG_VERSION:=0.1.0
-PKG_RELEASE:=1
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 25.12
 
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://github.com/g6094199/OpenWRT-Wireguard-friendly-cli-peernames.git
-PKG_SOURCE_VERSION:=REPLACE_WITH_TAG_OR_COMMIT
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      OPENWRT_REF: openwrt-25.12
+      FEED_PATH: feed-repo
+      REPO_PACKAGES_DIR: repo/packages
 
-PKG_MAINTAINER:=g6094199
-PKG_LICENSE:=GPL-3.0
-PKG_LICENSE_FILES:=LICENSE
+    steps:
+      - name: Checkout feed repo
+        uses: actions/checkout@v4
+        with:
+          path: ${{ env.FEED_PATH }}
 
-include $(INCLUDE_DIR)/package.mk
+      - name: Checkout OpenWrt source
+        uses: actions/checkout@v4
+        with:
+          repository: openwrt/openwrt
+          ref: ${{ env.OPENWRT_REF }}
+          path: openwrt
 
-define Package/wg-friendly
-  SECTION:=net
-  CATEGORY:=Network
-  TITLE:=WireGuard friendly CLI peer names
-  DEPENDS:=+wireguard-tools
-endef
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git build-essential libncurses5-dev gawk gettext unzip file python3 python3-distutils apk-tools
 
-define Package/wg-friendly/description
-  Small helper to show WireGuard peers with friendly names from UCI.
-endef
+      - name: Add feed and update
+        run: |
+          cd openwrt
+          echo "src-git myfeed ../${{ env.FEED_PATH }};25.12" >> feeds.conf
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
 
-# Prepare: klone das upstream-Repo und kopiere das Script in ./files/
-define Build/Prepare
-    $(call Build/Prepare/Default)
-    # Saubere Build-Quelle sicherstellen
-    rm -rf $(PKG_BUILD_DIR)
-    mkdir -p $(PKG_BUILD_DIR)
-    # Klonen (tiefe Kopie); wenn PKG_SOURCE_VERSION ein Branch/Tag ist, wird --branch genutzt
-    @if [ -n "$(PKG_SOURCE_VERSION)" ]; then \
-      git clone --depth 1 --branch $(PKG_SOURCE_VERSION) $(PKG_SOURCE_URL) $(PKG_BUILD_DIR) || { \
-        # Falls branch checkout fehlschlägt (z.B. bei Commit-Hash), klone default und checkout Commit
-        rm -rf $(PKG_BUILD_DIR); git clone --depth 1 $(PKG_SOURCE_URL) $(PKG_BUILD_DIR); \
-        git -C $(PKG_BUILD_DIR) fetch --depth 1 origin $(PKG_SOURCE_VERSION) || true; \
-        git -C $(PKG_BUILD_DIR) checkout $(PKG_SOURCE_VERSION) || true; \
-      }; \
-    else \
-      git clone --depth 1 $(PKG_SOURCE_URL) $(PKG_BUILD_DIR); \
-    fi
-    # Erstelle files/ und kopiere das Script (Pfad im upstream-Repo: wg-friendly im Repo-Root)
-    mkdir -p ./files
-    install -m 0755 $(PKG_BUILD_DIR)/wg-friendly ./files/wg-friendly || true
-endef
+      - name: Build package wg-friendly
+        run: |
+          cd openwrt
+          make package/wg-friendly/compile V=s
 
-define Build/Compile
-    # kein Kompilieren nötig (Shell-Script)
-endef
+      - name: Collect .apk artifacts
+        run: |
+          cd openwrt
+          mkdir -p ../${{ env.REPO_PACKAGES_DIR }}
+          # Kopiere alle .apk aus bin/packages in repo/packages
+          find bin/packages -type f -name "*.apk" -exec cp --parents {} ../${{ env.REPO_PACKAGES_DIR }} \; || true
+          ls -la ../${{ env.REPO_PACKAGES_DIR }} || true
 
-define Package/wg-friendly/install
-    $(INSTALL_DIR) $(1)/usr/bin
-    $(INSTALL_BIN) ./files/wg-friendly $(1)/usr/bin/wg-friendly
-    # optional: docs oder default config
-    $(INSTALL_DIR) $(1)/usr/share/doc/wg-friendly
-    $(INSTALL_DATA) ./files/README $(1)/usr/share/doc/wg-friendly/README || true
-endef
+      - name: Generate apk index packages.adb
+        run: |
+          cd ${{ env.REPO_PACKAGES_DIR }}
+          if ls *.apk 1> /dev/null 2>&1; then
+            apk index -o packages.adb *.apk
+          else
+            echo "No .apk files found"
+          fi
 
-$(eval $(call BuildPackage,wg-friendly))
+      - name: Prepare gh-pages content
+        run: |
+          rm -rf ghpages_tmp || true
+          mkdir -p ghpages_tmp
+          cp -r ${{ env.REPO_PACKAGES_DIR }}/* ghpages_tmp/ || true
+          touch ghpages_tmp/.nojekyll
+          ls -la ghpages_tmp
+
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./ghpages_tmp
+          publish_branch: gh-pages
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
