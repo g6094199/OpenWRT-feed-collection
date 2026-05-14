@@ -40,15 +40,23 @@ jobs:
       - name: Add feed (local) and update
         run: |
           cd openwrt
-          # Für ein lokal ausgechecktes Feed-Repo benutze src-link statt src-git
           echo "src-link myfeed ../${{ env.FEED_PATH }}" >> feeds.conf
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Build package wg-friendly
+      - name: Create default .config (non-interactive)
         run: |
           cd openwrt
-          make package/wg-friendly/compile V=s
+          # Erzeuge eine Standard-Konfiguration, damit make nicht menuconfig aufruft
+          make defconfig
+
+      - name: Build package wg-friendly (non-interactive)
+        env:
+          TERM: xterm
+        run: |
+          cd openwrt
+          # Setze TERM, damit ncurses-basierte Tools nicht mit "unknown terminal" fehlschlagen
+          TERM=xterm make package/wg-friendly/compile V=s
 
       - name: Collect .apk artifacts
         run: |
