@@ -33,16 +33,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y git build-essential libncurses5-dev gawk gettext unzip file python3 python3-pip
-          # Versuche python3-distutils; bei neueren Ubuntu-Releases kann der Paketname variieren
           if ! sudo apt-get install -y python3-distutils; then
             sudo apt-get install -y python3.11-distutils python3.12-distutils || true
           fi
-          # Hinweis: apk-tools ist auf ubuntu-latest oft nicht verfügbar; wir erzeugen den Index später in einem Alpine-Container
 
-      - name: Add feed and update
+      - name: Add feed (local) and update
         run: |
           cd openwrt
-          echo "src-git myfeed ../${{ env.FEED_PATH }};25.12" >> feeds.conf
+          # Für ein lokal ausgechecktes Feed-Repo benutze src-link statt src-git
+          echo "src-link myfeed ../${{ env.FEED_PATH }}" >> feeds.conf
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
@@ -62,7 +61,6 @@ jobs:
         run: |
           cd repo/packages
           if ls *.apk 1> /dev/null 2>&1; then
-            # Versuche lokal apk index; falls nicht vorhanden, nutze Alpine Docker-Container
             if command -v apk >/dev/null 2>&1; then
               apk index -o packages.adb *.apk
             else
