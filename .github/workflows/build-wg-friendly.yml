@@ -1,42 +1,53 @@
-name: Build and Deploy APK Feed
+name: Build wg-friendly for 25.12
 
 on:
+  push:
+    branches: [ "25.12", "main" ]
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Feed
+      - name: Checkout feed repo
         uses: actions/checkout@v4
-
-      - name: Prepare Feed Directory
-        run: |
-          mkdir -p openwrt_feed_collection/custom
-          cp -R net openwrt_feed_collection/custom/
-
-      - name: Build with SDK (allarch)
-        uses: openwrt/gh-action-sdk@main
-        env:
-          ARCH: all
-          FEED_DIR: openwrt_feed_collection
-          PACKAGES: wg-friendly
-          INDEX: 1
-
-      - name: Collect APKs
-        run: |
-          mkdir -p deploy/all
-          find bin/packages/ -name "wg-friendly*.apk" -exec cp {} deploy/all/ \;
-          find bin/packages/ -name "Packages*" -exec cp {} deploy/all/ \;
-          echo "<h1>OpenWrt Feed Collection</h1><p>Update: $(date)</p>" > deploy/index.html
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./deploy
-          force_orphan: true
+          path: feed-repo
+
+      - name: Checkout OpenWrt source (25.12)
+        uses: actions/checkout@v4
+        with:
+          repository: openwrt/openwrt
+          ref: openwrt-25.12
+          path: openwrt
+
+      - name: Copy feed into OpenWrt feeds
+        run: |
+          cd openwrt
+          echo "src-git myfeed ../feed-repo" >> feeds.conf
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses5-dev gawk gettext unzip file python3 python3-distutils
+
+      - name: Build package wg-friendly
+        run: |
+          cd openwrt
+          make package/wg-friendly/compile V=s
+
+      - name: Collect .apk artifacts
+        run: |
+          cd openwrt
+          mkdir -p ../repo/packages
+          # Suche nach erzeugten apk Dateien (OpenWrt 25.12 erzeugt .apk in bin/packages/<arch>/)
+          find bin/packages -name "*.apk" -exec cp {} ../repo/packages/ \; || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wg-friendly-apks
+          path: repo/packages
+
