@@ -1,4 +1,4 @@
-name: Build wg-friendly for 25.12
+name: Build wg-friendly and publish to GitHub Pages
 
 on:
   workflow_dispatch:
@@ -8,12 +8,13 @@ on:
       - 25.12
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     env:
       OPENWRT_REF: openwrt-25.12
       FEED_PATH: feed-repo
       REPO_PACKAGES_DIR: repo/packages
+      GHPAGES_BRANCH: gh-pages
 
     steps:
       - name: Checkout feed repo
@@ -28,10 +29,15 @@ jobs:
           ref: ${{ env.OPENWRT_REF }}
           path: openwrt
 
-      - name: Install build dependencies
+      - name: Install build dependencies (conditional)
         run: |
           sudo apt-get update
-          sudo apt-get install -y git build-essential libncurses5-dev gawk gettext unzip file python3 python3-distutils apk-tools
+          sudo apt-get install -y git build-essential libncurses5-dev gawk gettext unzip file python3 python3-pip
+          # Versuche python3-distutils; bei neueren Ubuntu-Releases kann der Paketname variieren
+          if ! sudo apt-get install -y python3-distutils; then
+            sudo apt-get install -y python3.11-distutils python3.12-distutils || true
+          fi
+          # Hinweis: apk-tools ist auf ubuntu-latest oft nicht verfügbar; wir erzeugen den Index später in einem Alpine-Container
 
       - name: Add feed and update
         run: |
@@ -49,15 +55,21 @@ jobs:
         run: |
           cd openwrt
           mkdir -p ../${{ env.REPO_PACKAGES_DIR }}
-          # Kopiere alle .apk aus bin/packages in repo/packages
-          find bin/packages -type f -name "*.apk" -exec cp --parents {} ../${{ env.REPO_PACKAGES_DIR }} \; || true
+          find bin/packages -type f -name "*.apk" -exec cp {} ../${{ env.REPO_PACKAGES_DIR }}/ \; || true
           ls -la ../${{ env.REPO_PACKAGES_DIR }} || true
 
-      - name: Generate apk index packages.adb
+      - name: Generate apk index (Alpine container fallback)
         run: |
-          cd ${{ env.REPO_PACKAGES_DIR }}
+          cd repo/packages
           if ls *.apk 1> /dev/null 2>&1; then
-            apk index -o packages.adb *.apk
+            # Versuche lokal apk index; falls nicht vorhanden, nutze Alpine Docker-Container
+            if command -v apk >/dev/null 2>&1; then
+              apk index -o packages.adb *.apk
+            else
+              echo "apk not found on runner, using Alpine container to generate packages.adb"
+              docker run --rm -v "$PWD":/work -w /work alpine:3.18 sh -c "apk index -o packages.adb *.apk"
+            fi
+            ls -la packages.adb
           else
             echo "No .apk files found"
           fi
@@ -66,7 +78,7 @@ jobs:
         run: |
           rm -rf ghpages_tmp || true
           mkdir -p ghpages_tmp
-          cp -r ${{ env.REPO_PACKAGES_DIR }}/* ghpages_tmp/ || true
+          cp -r repo/packages/* ghpages_tmp/ || true
           touch ghpages_tmp/.nojekyll
           ls -la ghpages_tmp
 
@@ -75,6 +87,6 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./ghpages_tmp
-          publish_branch: gh-pages
+          publish_branch: ${{ env.GHPAGES_BRANCH }}
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
