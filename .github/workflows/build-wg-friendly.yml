@@ -7,23 +7,21 @@ on:
       - main
       - 25.12
 
-env:
-  OPENWRT_REF: openwrt-25.12
-  FEED_PATH: feed-repo
-  REPO_PACKAGES_DIR: repo/packages
-  GHPAGES_BRANCH: gh-pages
-  # Setze hier einen Commit/Tag für das wg-friendly Repo für Reproduzierbarkeit
-  WG_FRIENDLY_COMMIT: main
-
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    env:
+      OPENWRT_REF: openwrt-25.12
+      REPO_PACKAGES_DIR: repo/packages
+      GHPAGES_BRANCH: gh-pages
+      # Pinne hier optional einen Commit/Tag für Reproduzierbarkeit
+      WG_FRIENDLY_COMMIT: main
 
     steps:
-      - name: Checkout feed repo (optional, used for repo metadata)
+      - name: Checkout feed repo (optional)
         uses: actions/checkout@v4
         with:
-          path: ${{ env.FEED_PATH }}
+          path: feed-repo
 
       - name: Checkout OpenWrt source
         uses: actions/checkout@v4
@@ -43,15 +41,13 @@ jobs:
       - name: Prepare package directory and fetch wg-friendly script (on the fly)
         run: |
           set -e
-          # Erstelle Paketverzeichnis direkt im OpenWrt-Tree
           mkdir -p openwrt/package/local/wg-friendly/files
-          # Hole das Script raw von GitHub (pinne Commit/Tag über WG_FRIENDLY_COMMIT)
           RAW_URL="https://raw.githubusercontent.com/g6094199/OpenWRT-Wireguard-friendly-cli-peernames/${WG_FRIENDLY_COMMIT}/wg-friendly"
           echo "Fetching wg-friendly from: $RAW_URL"
           curl -fsSL "$RAW_URL" -o openwrt/package/local/wg-friendly/files/wg-friendly
           chmod 0755 openwrt/package/local/wg-friendly/files/wg-friendly
-          # Erzeuge ein einfaches Makefile für das Paket (GPL-3.0)
-          cat > openwrt/package/local/wg-friendly/Makefile <<'EOF'
+
+          cat > openwrt/package/local/wg-friendly/Makefile <<'MAKEFILE'
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=wg-friendly
@@ -89,21 +85,19 @@ define Package/wg-friendly/install
 endef
 
 $(eval $(call BuildPackage,wg-friendly))
-EOF
-          # Optional: lege eine kurze LICENSE-Datei ab (GPL-3.0 Hinweis)
-          cat > openwrt/package/local/wg-friendly/LICENSE <<'EOF'
+MAKEFILE
+
+          cat > openwrt/package/local/wg-friendly/LICENSE <<'LICENSE'
 GPL-3.0-or-later
-EOF
+LICENSE
+
           ls -la openwrt/package/local/wg-friendly
-          echo "Package prepared."
 
       - name: Update feeds (safe) and list packages
         run: |
           cd openwrt
-          # feeds.conf kann leer bleiben; wir haben das Paket direkt im package/local
           ./scripts/feeds update -a || true
           ./scripts/feeds install -a || true
-          # Debug: liste erkannte Pakete
           find package -maxdepth 3 -type f -name "Makefile" -print | sed -n '1,200p'
           grep -R "Package/wg-friendly" -n package || true
 
